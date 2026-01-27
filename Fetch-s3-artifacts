@@ -1,1 +1,118 @@
+#!/bin/python3
+import json
+import boto3
+import csv
+import os
+import sys
+from botocore.exceptions import ClientError
+from botocore.config import Config
+from datetime import datetime
+from time import sleep
+import datetime
+import smtplib
+# import the corresponding modules
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
+#Enter all req. variables
+globalVars  = {}
+if len(sys.argv)!=3:
+   print("please enter Retention days ")
+   sys.exit(1)
+globalVars['RetentionDays']= int(sys.argv[1])
+Prefix=sys.argv[2]
+#region_name=sys.argv[2]
+date = datetime.date.today()
+Artifacts_older_than_RetentionDays = ( datetime.date.today() - datetime.timedelta(days= int(globalVars['RetentionDays'])) ).strftime('%Y-%m-%d')
+#reponame=str(input("enter repository name:"))
+Outdated_Artifacts="Outdated_Artifacts.csv"
+
+def list_Artifacts():
+    count=1
+    config = Config(connect_timeout=5, read_timeout=60, retries = {'max_attempts': 20, 'mode': 'standard'})
+    bucket_name = "s3 bucket name-artifacts"
+    s3_client = boto3.client("s3")
+    # First we list all files in folder
+    response = s3_client.list_objects_v2(Bucket=bucket_name ,Prefix=Prefix , Delimiter='/')
+    with open(Outdated_Artifacts,  'w' ) as csvfile:
+       writer = csv.DictWriter(csvfile, quoting=csv.QUOTE_ALL, delimiter=',',  fieldnames=['Key','Size','LastModified'],extrasaction='ignore')
+       writer.writeheader()
+      # writer = csv.DictWriter(csvfile, quoting=csv.QUOTE_ALL, delimiter=',',  fieldnames=['Key','LastModified'])
+
+       for obj in response['Contents'][1:]:
+          if obj['LastModified'].strftime('%Y-%m-%d') <= Artifacts_older_than_RetentionDays:
+       #   print(obj['Key'],obj['LastModified'],count)
+       #   count=count+1
+             writer.writerow({'Key':obj['Key'],'LastModified':obj['LastModified'],'Size':obj['Size']})
+    print("Sending to your mail ")
+
+list_Artifacts()
+
+
+smtp_server = "postoffice.domain.com"
+
+subject = "OUTDATED S3 OBJECT REPORT GENRATION e.g=BRM/PDC ARTIFACTS"
+
+sender_email = "verma@.com"
+
+receiver_email = "verma.@com,shivam.@.com"
+
+
+message = MIMEMultipart()
+
+message["From"] = sender_email
+
+message["To"] = receiver_email
+
+message["Subject"] = subject
+
+# Add body to email
+
+body = "These are the Outdated BRM/PDC ARTIFACTS"
+
+message.attach(MIMEText(body, "plain"))
+
+filename = "Outdated_Artifacts.csv"
+
+# Open PDF file in binary mode
+
+# We assume that the file is in the directory where you run your Python script from
+
+with open(filename, "rb") as attachment:
+
+    # The content type "application/octet-stream" means that a MIME attachment is a binary file
+
+    part = MIMEBase("application", "octet-stream")
+
+    part.set_payload(attachment.read())
+
+
+# Encode to base64
+
+encoders.encode_base64(part)
+
+# Add header
+
+part.add_header(
+
+    "Content-Disposition",
+
+    f"attachment; filename= {filename}",
+
+)
+
+# Add attachment to your message and convert it to string
+
+message.attach(part)
+
+text = message.as_string()
+
+# send your email
+
+with smtplib.SMTP("postoffice.equifax.com") as server:
+
+    server.sendmail(sender_email, receiver_email, text)
+
+print('Sent')

@@ -111,7 +111,7 @@ text = message.as_string()
 
 # send your email
 
-with smtplib.SMTP("postoffice.equifax.com") as server:
+with smtplib.SMTP("postoffice.domain.com") as server:
 
     server.sendmail(sender_email, receiver_email, text)
 
